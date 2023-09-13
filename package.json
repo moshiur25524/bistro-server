@@ -6,8 +6,14 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "node",
+    "package.json",
+    "javascript",
+    "npm",
+    "yarn"
+  ],
+  "author": "Md. Moshiur Rahman",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
