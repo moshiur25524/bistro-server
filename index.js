@@ -52,6 +52,7 @@ async function run() {
     const reviewsCollection = client.db("BistroDB").collection("reviews");
     const cartCollection = client.db("BistroDB").collection("carts");
 
+    // Sign a jwt token
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -125,6 +126,18 @@ async function run() {
     // menu related api
     app.get("/menu", async (req, res) => {
       const result = await menuCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post("/menu", verifyJWT, verifyAdmin, async (req, res) => {
+      const newItem = req.body;
+      const result = await menuCollection.insertOne(newItem);
+      res.send(result);
+    });
+
+    app.delete("/menu/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const result = await menuCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
