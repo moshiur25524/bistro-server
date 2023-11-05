@@ -1,9 +1,10 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
-require("dotenv").config();
 const app = express();
 
 // middleware
@@ -51,6 +52,7 @@ async function run() {
     const menuCollection = client.db("BistroDB").collection("menu");
     const reviewsCollection = client.db("BistroDB").collection("reviews");
     const cartCollection = client.db("BistroDB").collection("carts");
+    const paymentCollection = client.db("BistroDB").collection("payments");
 
     // Sign a jwt token
     app.post("/jwt", (req, res) => {
@@ -135,7 +137,7 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/menu/:id", verifyJWT, verifyAdmin, async (req, res) => {
+    app.delete("/menu/:id", async (req, res) => {
       const id = req.params.id;
       const result = await menuCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
@@ -180,6 +182,33 @@ async function run() {
       const result = await cartCollection.deleteOne({ _id: new ObjectId(id) });
       console.log(result);
       res.send(result);
+    });
+
+    app.get("/payments", async (req, res) => {
+      const result = await paymentCollection.find({}).toArray();
+      res.send(result);
+    });
+
+    app.post("/payments", verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment);
+      res.send(result);
+    });
+
+    // Create payment intent by stripe
+
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
 
     console.log("You successfully connected to MongoDB!");
