@@ -125,6 +125,57 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/admin-stats", async (req, res) => {
+      const users = await usersCollection.estimatedDocumentCount();
+      const products = await menuCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
+      const payments = await paymentCollection.find({}).toArray();
+      const revenue = payments.reduce((sum, payment) => sum + payment.price, 0);
+
+      const fixedrevenue = revenue.toFixed(2);
+      res.send({
+        users,
+        products,
+        orders,
+        fixedrevenue,
+      });
+    });
+
+    app.get("/order-stats", async (req, res) => {
+      try {
+        const pipeline = [
+          {
+            $lookup: {
+              from: "menu",
+              localField: "menuItems",
+              foreignField: "_id",
+              as: "menuItemsData",
+            },
+          },
+          {
+            $unwind: "$menuItemsData",
+          },
+          {
+            $group: {
+              _id: "$menuItemsData.category",
+              count: { $sum: 1 },
+              totalPrice: { $sum: "$menuItemsData.price" },
+            },
+          },
+        ];
+
+        const result = await paymentCollection.aggregate(pipeline).toArray();
+
+        if (result.length === 0) {
+          return res.status(404).json({ message: "No data found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
     // menu related api
     app.get("/menu", async (req, res) => {
       const result = await menuCollection.find().toArray();
@@ -184,22 +235,38 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/payment", async (req, res) => {
+      const email = req.query.email;
+      console.log(email);
+      const payments = await paymentCollection.find({}).toArray();
+      const result = payments.filter((payment) => payment?.email === email);
+      res.status(200).json({
+        status: "Success",
+        data: result,
+      });
+    });
+
     app.get("/payments", async (req, res) => {
       const result = await paymentCollection.find({}).toArray();
       res.send(result);
     });
 
+    // step 7: created the payment api
     app.post("/payments", verifyJWT, async (req, res) => {
       const payment = req.body;
-      const result = await paymentCollection.insertOne(payment);
-      res.send(result);
+      const insertResult = await paymentCollection.insertOne(payment);
+      const query = {
+        _id: { $in: payment.cartItems.map((id) => new ObjectId(id)) },
+      };
+      const deletedResult = await cartCollection.deleteMany(query);
+      res.send({ insertResult, deletedResult });
     });
 
-    // Create payment intent by stripe
+    // step 7: created the payment intent api for payment
 
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
-      const amount = price * 100;
+      const amount = parseInt(price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
