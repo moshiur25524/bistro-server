@@ -53,6 +53,7 @@ async function run() {
     const reviewsCollection = client.db("BistroDB").collection("reviews");
     const cartCollection = client.db("BistroDB").collection("carts");
     const paymentCollection = client.db("BistroDB").collection("payments");
+    const bookingCollection = client.db("BistroDB").collection("bookings");
 
     // Sign a jwt token
     app.post("/jwt", (req, res) => {
@@ -84,6 +85,7 @@ async function run() {
     */
 
     // user related api
+
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
@@ -276,6 +278,24 @@ async function run() {
       res.send({
         clientSecret: paymentIntent.client_secret,
       });
+    });
+
+    app.get("/bookings", async (req, res) => {
+      const result = await bookingCollection.find({}).toArray();
+      res.send(result);
+    });
+
+    app.get("/booking", async (req, res) => {
+      const BookedEmail = req.query.email;
+      const bookings = await bookingCollection.find({}).toArray();
+      const result = bookings.filter((book) => book?.email === BookedEmail);
+      res.send(result);
+    });
+
+    app.post("/bookings", async (req, res) => {
+      const booking = req.body;
+      const result = await bookingCollection.insertOne(booking);
+      res.send(result);
     });
 
     console.log("You successfully connected to MongoDB!");
