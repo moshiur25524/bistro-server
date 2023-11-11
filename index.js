@@ -143,6 +143,35 @@ async function run() {
       });
     });
 
+    app.get("/home-stats", async (req, res) => {
+      try {
+        const { email } = req.query;
+        const orders = await paymentCollection.find({ email: email }).toArray();
+        const reviews = await reviewsCollection
+          .find({ email: email })
+          .toArray();
+        const bookings = await bookingCollection
+          .find({ email: email })
+          .toArray();
+        const payments = await paymentCollection
+          .find({ email: email })
+          .toArray();
+        const ordersCount = orders.length;
+        const reviewsCount = reviews.length;
+        const bookingsCount = bookings.length;
+        const paymentsCount = payments.length;
+
+        res.send({
+          ordersCount,
+          reviewsCount,
+          bookingsCount,
+          paymentsCount,
+        });
+      } catch (error) {
+        res.status(500).json({ message: error.message });
+      }
+    });
+
     app.get("/order-stats", async (req, res) => {
       try {
         const pipeline = [
@@ -191,7 +220,7 @@ async function run() {
     });
 
     app.delete("/menu/:id", async (req, res) => {
-      const id = req.params.id;
+      const { id } = req.params;
       const result = await menuCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
@@ -286,9 +315,16 @@ async function run() {
     });
 
     app.get("/booking", async (req, res) => {
-      const BookedEmail = req.query.email;
-      const bookings = await bookingCollection.find({}).toArray();
-      const result = bookings.filter((book) => book?.email === BookedEmail);
+      const email = req.query.email;
+      if (!email) {
+        res.send([]);
+      }
+      // const decodedEmail = req.decoded.email;
+      // if (email !== decodedEmail) {
+      //   return res.status(403).send("Forbidden Access");
+      // }
+
+      const result = await bookingCollection.find({ email }).toArray();
       res.send(result);
     });
 
@@ -296,6 +332,12 @@ async function run() {
       const booking = req.body;
       const result = await bookingCollection.insertOne(booking);
       res.send(result);
+    });
+
+    // TODO: have to create put api for booking endpoint
+    app.put("bookings/:id", async (req, res) => {
+      const { id } = req.params;
+      const filter = {};
     });
 
     console.log("You successfully connected to MongoDB!");
