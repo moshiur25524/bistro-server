@@ -54,6 +54,7 @@ async function run() {
     const cartCollection = client.db("BistroDB").collection("carts");
     const paymentCollection = client.db("BistroDB").collection("payments");
     const bookingCollection = client.db("BistroDB").collection("bookings");
+    const contactCollection = client.db("BistroDB").collection("contacts");
 
     // Sign a jwt token
     app.post("/jwt", (req, res) => {
@@ -150,6 +151,10 @@ async function run() {
         const reviews = await reviewsCollection
           .find({ email: email })
           .toArray();
+        const contacts = await contactCollection
+          .find({ email: email })
+          .toArray();
+        const carts = await cartCollection.find({ email: email }).toArray();
         const bookings = await bookingCollection
           .find({ email: email })
           .toArray();
@@ -158,14 +163,18 @@ async function run() {
           .toArray();
         const ordersCount = orders.length;
         const reviewsCount = reviews.length;
+        const contactCount = contacts.length;
         const bookingsCount = bookings.length;
         const paymentsCount = payments.length;
+        const cartsCount = carts.length;
 
         res.send({
           ordersCount,
           reviewsCount,
           bookingsCount,
           paymentsCount,
+          contactCount,
+          cartsCount,
         });
       } catch (error) {
         res.status(500).json({ message: error.message });
@@ -268,7 +277,7 @@ async function run() {
 
     app.get("/payment", async (req, res) => {
       const email = req.query.email;
-      console.log(email);
+      // console.log(email);
       const payments = await paymentCollection.find({}).toArray();
       const result = payments.filter((payment) => payment?.email === email);
       res.status(200).json({
@@ -338,6 +347,34 @@ async function run() {
     app.put("bookings/:id", async (req, res) => {
       const { id } = req.params;
       const filter = {};
+    });
+
+    app.delete("/bookings/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await bookingCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      console.log(result);
+      res.send(result);
+    });
+
+    app.get("/contacts", async (req, res) => {
+      try {
+        const result = await contactCollection.find({}).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error.message);
+      }
+    });
+
+    app.post("/contact", async (req, res) => {
+      try {
+        const data = req.body;
+        const result = await contactCollection.insertOne(data);
+        res.send(result);
+      } catch (error) {
+        console.log(error.message);
+      }
     });
 
     console.log("You successfully connected to MongoDB!");
