@@ -1,9 +1,16 @@
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { ObjectId } = require("mongodb");
+const verifyJWT = require("./utils/jwtToken");
+const client = require("./utils/mongoConnection");
+const reviewsRoute = require("./Routes/ReviewsRoute");
+const bookingsRoute = require("./Routes/BookingsRoute");
+const paymentRoute = require("./Routes/PaymentRoute");
+const contactsRoute = require("./Routes/ContactsRoute");
+const menuRoute = require("./Routes/MenuRoute");
 const port = process.env.PORT || 5000;
 const app = express();
 
@@ -12,40 +19,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const verifyJWT = (req, res, next) => {
-  const authorization = req.headers.authorization;
-  if (!authorization) {
-    return res
-      .status(401)
-      .send({ error: true, message: "unauthorized access" });
-  }
-  const token = authorization.split(" ")[1];
-
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    if (err) {
-      return res
-        .status(401)
-        .send({ error: true, message: "unauthorized access" });
-    }
-    req.decoded = decoded;
-    next();
-  });
-};
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.oesiy.mongodb.net/?retryWrites=true&w=majority`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
-
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
+    // Connect the client to the server
     await client.connect();
 
     const usersCollection = client.db("BistroDB").collection("users");
@@ -217,10 +193,7 @@ async function run() {
     });
 
     // menu related api
-    app.get("/menu", async (req, res) => {
-      const result = await menuCollection.find().toArray();
-      res.send(result);
-    });
+    app.use("/menu", menuRoute);
 
     app.post("/menu", verifyJWT, verifyAdmin, async (req, res) => {
       const newItem = req.body;
@@ -234,17 +207,7 @@ async function run() {
       res.send(result);
     });
 
-    // review related api
-    app.get("/reviews", async (req, res) => {
-      const result = await reviewsCollection.find().toArray();
-      res.send(result);
-    });
-
-    app.post("/reviews", async (req, res) => {
-      const review = req.body;
-      const result = await reviewsCollection.insertOne(review);
-      res.send(result);
-    });
+    app.use("/reviews", reviewsRoute);
 
     // carts collection apis
     app.get("/carts", verifyJWT, async (req, res) => {
@@ -286,10 +249,7 @@ async function run() {
       });
     });
 
-    app.get("/payments", async (req, res) => {
-      const result = await paymentCollection.find({}).toArray();
-      res.send(result);
-    });
+    app.use("/payments", paymentRoute);
 
     // step 7: created the payment api
     app.post("/payments", verifyJWT, async (req, res) => {
@@ -318,10 +278,7 @@ async function run() {
       });
     });
 
-    app.get("/bookings", async (req, res) => {
-      const result = await bookingCollection.find({}).toArray();
-      res.send(result);
-    });
+    app.use("/bookings", bookingsRoute);
 
     app.get("/booking", async (req, res) => {
       const email = req.query.email;
@@ -337,45 +294,13 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/bookings", async (req, res) => {
-      const booking = req.body;
-      const result = await bookingCollection.insertOne(booking);
-      res.send(result);
-    });
-
     // TODO: have to create put api for booking endpoint
     app.put("bookings/:id", async (req, res) => {
       const { id } = req.params;
       const filter = {};
     });
 
-    app.delete("/bookings/:id", async (req, res) => {
-      const { id } = req.params;
-      const result = await bookingCollection.deleteOne({
-        _id: new ObjectId(id),
-      });
-      console.log(result);
-      res.send(result);
-    });
-
-    app.get("/contacts", async (req, res) => {
-      try {
-        const result = await contactCollection.find({}).toArray();
-        res.send(result);
-      } catch (error) {
-        console.log(error.message);
-      }
-    });
-
-    app.post("/contact", async (req, res) => {
-      try {
-        const data = req.body;
-        const result = await contactCollection.insertOne(data);
-        res.send(result);
-      } catch (error) {
-        console.log(error.message);
-      }
-    });
+    app.use("/contacts", contactsRoute);
 
     console.log("You successfully connected to MongoDB!");
   } finally {
